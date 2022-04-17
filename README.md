@@ -1,70 +1,138 @@
-# Getting Started with Create React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Creating the Frontend application with Amplify
 
-## Available Scripts
+In this section, we describe the steps that we need to follow to create the frontend services using the Amplify tools and services to build the React application.
 
-In the project directory, you can run:
+1. **Create and initialize Amplify project**
 
-### `npm start`
+Create react application and install dependencies.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+``` bash
+npx create-react-app amplify-video-frontend-mediatailor
+cd amplify-video-frontend-mediatailor
+npm install @mui/material @emotion/react @emotion/styled @mui/icons-material
+npm i @aws-amplify/ui-react aws-amplify video.js
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+``` bash
+amplify init
+```
 
-### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+* Enter a name for the project **amplifyvideofrontend**
+* Project information
+  * Name: amplifyvideofrontend
+  * Environment: dev
+  * Default editor: Visual Studio Code
+  * App type: javascript
+  * Javascript framework: react
+  * Source Directory Path: src
+  * Distribution Directory Path: build
+  * Build Command: npm run-script build
+  * Start Command: npm run-script start
+* Initialize the project with the above configuration? (Y/n) **Yes**
+* Using default provider **awscloudformation**
+* Do you want to use an AWS profile? **Yes**
+* Please choose the profile you want to use **default** (Choose your profile with IAM credentials)
 
-### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+2. **Add Authentication**
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Add Authentication with Amazon Cognito as the main authentication provider. Use the default configuration as follow.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+``` bash
+amplify add auth
+```
 
-### `npm run eject`
+* Do you want to use the default authentication and security configuration? **Default configuration**
+* How do you want users to be able to sign in? **Username**
+* Do you want to configure advanced settings? **No, I am done.**
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+To deploy the services, execute the following command.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+``` bash
+amplify push
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+* Are you sure you want to continue? Yes
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+3. **Add API (GraphQL)**
 
-## Learn More
+Add an AppSync GraphQL API with Cognito User Pool for the API Authentication.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+``` bash
+amplify add api
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+* Please select from one of the below mentioned services: **GraphQL**
+* Provide API name: **amplifyvideofrontend**
+* Choose the default authorization type for the **API Amazon Cognito User Pool** Use a Cognito user pool configured as a part of this project.
+* Do you want to configure advanced settings for the GraphQL API **No, I am done**
+* Do you have an annotated GraphQL schema? **No**
+* Choose a schema template: **Single object with fields (e.g., “Todo” with ID, name, description)**
+* Do you want to edit the schema now? **Yes**
 
-### Code Splitting
+Edit the schema by opening the new schema.graphql file in your editor, replace with the following schema.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```
+# This "input" configures a global authorization rule to enable public access to
+# all models in this schema. Learn more about authorization rules here: https://docs.amplify.aws/cli/graphql/authorization-rules
+input AMPLIFY { globalAuthRule: AuthRule = { allow: public } } # FOR TESTING ONLY!
 
-### Analyzing the Bundle Size
+type Message @model(subscriptions: null)
+{
+  id: ID!
+  channel: String! @index(name: "messagesByDate", queryField: "messagesByDate", sortKeyFields: ["createdAt"])
+  username: String!
+  content: String!
+  createdAt: String!
+}
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+type Subscription {
+  onCreateMessage: Message @aws_subscribe(mutations: ["createMessage"])
+}
+```
 
-### Making a Progressive Web App
+Once you are happy with your schema, save the file and deploy your new API.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+``` bash
+amplify push
+```
 
-### Advanced Configuration
+* Are you sure you want to continue? **Yes**
+* Do you want to generate code for your newly created GraphQL API **Yes**
+* Choose the code generation language target **javascript**
+* Enter the file name pattern of graphql queries, mutations and subscriptions **src/graphql//*.js**
+* Do you want to generate/update all possible GraphQL operations - queries, mutations and subscriptions **Yes**
+* Enter maximum statement depth [increase from default if your schema is deeply nested] **2**
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+4. **Create/Replace React application files**
 
-### Deployment
+Update the following files in your React application.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+* src/App.js
+* public/index.html
 
-### `npm run build` fails to minify
+Create the following files in your React application.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+* src/components/VideoPlayer.js
+* src/components/VideoChat.js
+
+5. **Add Hosting**
+
+For this exercise we are going to choose manual deploys allows you to publish your web app to the Amplify Console without connecting a Git provider.
+
+``` bash
+amplify add hosting
+```
+
+* Select the plugin module to execute **Hosting with Amplify Console (Managed hosting with custom domains, Continuous deployment)**
+* Choose a type **Manual deployment**
+
+Deploy the application by running the following command, it will build the scripts.
+
+``` bash
+amplify publish
+```
+
+* Are you sure you want to continue? Yes
