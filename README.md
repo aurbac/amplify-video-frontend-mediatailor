@@ -118,7 +118,53 @@ Create the following files in your React application.
 * src/components/VideoPlayer.js
 * src/components/VideoChat.js
 
-5. **Add Hosting**
+5. **Add Function**
+
+``` bash
+amplify add function
+```
+
+* ? Select which capability you want to add: **Lambda function (serverless function)**
+* ? Provide an AWS Lambda function name: **triggerMessages**
+* ? Choose the runtime that you want to use: **NodeJS**
+* ? Choose the function template that you want to use: **Hello World**
+
+Available advanced settings:
+- Resource access permissions
+- Scheduled recurring invocation
+- Lambda layers configuration
+- Environment variables configuration
+- Secret values configuration
+
+* ? Do you want to configure advanced settings? **No**
+* ? Do you want to edit the local lambda function now? **No**
+
+Update the ... .js file... (logic)
+
+Update the file amplify/backend/function/triggerMessages/custom-policies.json with the following:
+
+
+``` json
+[
+  {
+    "Action": ["dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:DescribeStream", "dynamodb:ListStreams", "kinesis:ListShards", "comprehend:DetectSentiment"],
+    "Resource": ["*"]
+  }
+]
+```
+
+Deploy cloud services.
+
+``` bash
+amplify push
+```
+
+* ? Are you sure you want to continue? **Yes**
+
+Configure dynamodb tablle trigger using the "triggerMessages" function.
+
+
+6. **Add Hosting**
 
 For this exercise we are going to choose manual deploys allows you to publish your web app to the Amplify Console without connecting a Git provider.
 

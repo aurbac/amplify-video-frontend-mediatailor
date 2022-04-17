@@ -20,6 +20,12 @@
           "appId": "d2mseyms82ck8m",
           "type": "manual"
         }
+      },
+      "function": {
+        "triggerMessages": {
+          "deploymentBucketName": "amplify-amplifyvideofrontend-dev-202209-deployment",
+          "s3Key": "amplify-builds/triggerMessages-2f665056727a49306b53-build.zip"
+        }
       }
     }
   }

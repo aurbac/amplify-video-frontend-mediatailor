@@ -1,0 +1,6 @@
+[
+  {
+    "Action": ["dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:DescribeStream", "dynamodb:ListStreams", "kinesis:ListShards", "comprehend:DetectSentiment"],
+    "Resource": ["*"]
+  }
+]
