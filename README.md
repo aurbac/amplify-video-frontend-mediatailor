@@ -3,6 +3,16 @@
 
 In this section, we describe the steps that we need to follow to create the frontend services using the Amplify tools and services to build the React application.
 
+
+## Prerequisites
+
+* Obtain an [AWS Account](http://aws.amazon.com/).
+* Work in your local or [AWS Cloud9](https://aws.amazon.com/cloud9/) environment with the following tools configured:
+  * [AWS CLI configured with IAM Credentials with administrator access](https://docs.aws.amazon.com/cli/latest/reference/configure/).
+  * [Install the Amplify CLI](https://docs.amplify.aws/cli/start/install).
+  * [Install the CDK CLI](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html#getting_started_install).
+
+
 1. **Create and initialize Amplify project**
 
 Create react application and install dependencies.
@@ -64,15 +74,12 @@ Add an AppSync GraphQL API with Cognito User Pool for the API Authentication.
 amplify add api
 ```
 
-* Please select from one of the below mentioned services: **GraphQL**
-* Provide API name: **amplifyvideofrontend**
-* Choose the default authorization type for the **API Amazon Cognito User Pool** Use a Cognito user pool configured as a part of this project.
-* Do you want to configure advanced settings for the GraphQL API **No, I am done**
-* Do you have an annotated GraphQL schema? **No**
-* Choose a schema template: **Single object with fields (e.g., “Todo” with ID, name, description)**
-* Do you want to edit the schema now? **Yes**
+* ? Select from one of the below mentioned services: **GraphQL**
+* ? Here is the GraphQL API that we will create. Select a setting to edit or continue **Continue**
+* ? Choose a schema template: **Single object with fields (e.g., “Todo” with ID, name, description)**
+* Do you want to edit the schema now? **No**
 
-Edit the schema by opening the new schema.graphql file in your editor, replace with the following schema.
+Edit the schema by opening the new amplify/backend/api/schema.graphql file in your editor, replace with the following schema.
 
 ```
 # This "input" configures a global authorization rule to enable public access to
@@ -118,7 +125,47 @@ Create the following files in your React application.
 * src/components/VideoPlayer.js
 * src/components/VideoChat.js
 
-5. **Add Function**
+5. **Add dynamodb table with Amplify Storage**
+
+``` bash
+amplify add storage
+```
+
+* ✔ Provide a friendly name · **tables**
+* ✔ Provide table name · **collection**
+
+You can now add columns to the table.
+
+* ✔ What would you like to name this column · **channel**
+* ✔ Choose the data type · **string**
+* ✔ Would you like to add another column? (Y/n) · **yes**
+* ✔ What would you like to name this column · **keyword**
+* ✔ Choose the data type · **string**
+* ✔ Would you like to add another column? (Y/n) · **no**
+
+Before you create the database, you must specify how items in your table are uniquely organized. You do this by specifying a primary key. The primary key uniquely identifies each item in the table so that no two items can have the same key. This can be an individual column, or a combination that includes a primary key and a sort key.
+
+To learn more about primary keys, see:
+https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.CoreComponents.html#HowItWorks.CoreComponents.PrimaryKey
+
+* ✔ Choose partition key for the table · **channel**
+* ✔ Do you want to add a sort key to your table? (Y/n) · **yes**
+Only one option for [Choose sort key for the table]. Selecting [keyword].
+
+You can optionally add global secondary indexes for this table. These are useful when you run queries defined in a different column than the primary key.
+To learn more about indexes, see:
+https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.CoreComponents.html#HowItWorks.CoreComponents.SecondaryIndexes
+
+* ✔ Do you want to add global secondary indexes to your table? (Y/n) · **yes**
+* ✔ Provide the GSI name · **main**
+* ✔ Choose partition key for the GSI · **keyword**
+* ✔ Do you want to add a sort key to your global secondary index? (Y/n) · **no**
+* ✔ Do you want to add more global secondary indexes to your table? (Y/n) · **no**
+* ✔ Do you want to add a Lambda Trigger for your Table? (y/N) · **no**
+
+
+6. **Add the Lambda function triggered after new chat messages**
+
 
 ``` bash
 amplify add function
@@ -136,10 +183,119 @@ Available advanced settings:
 - Environment variables configuration
 - Secret values configuration
 
-* ? Do you want to configure advanced settings? **No**
+* ? Do you want to configure advanced settings? **Yes**
+* ? Do you want to access other resources in this project from your Lambda function? **Yes**
+* ? Select the categories you want this function to have access to. **storage**
+* ? Storage has 2 resources in this project. Select the one you would like your Lambda to access **tables**
+* ? Select the operations you want to permit on tables **read, update**
+
+You can access the following resource attributes as environment variables from your Lambda function
+        ENV
+        REGION
+        STORAGE_TABLES_ARN
+        STORAGE_TABLES_NAME
+        STORAGE_TABLES_STREAMARN
+
+* ? Do you want to invoke this function on a recurring schedule? **No**
+* ? Do you want to enable Lambda layers for this function? **No**
+* ? Do you want to configure environment variables for this function? **No**
+* ? Do you want to configure secret values this function can access? **No**
 * ? Do you want to edit the local lambda function now? **No**
 
-Update the ... .js file... (logic)
+Update the amplify/backend/function/triggerMessages/src/index.js file with the following:
+
+``` javascript
+/* Amplify Params - DO NOT EDIT
+	ENV
+	REGION
+	STORAGE_TABLES_ARN
+	STORAGE_TABLES_NAME
+	STORAGE_TABLES_STREAMARN
+Amplify Params - DO NOT EDIT */
+
+const AWS = require('aws-sdk');
+AWS.config.update({region: process.env.REGION});
+
+var docClient = new AWS.DynamoDB.DocumentClient();
+
+/**
+ * @type {import('@types/aws-lambda').APIGatewayProxyHandler}
+ */
+exports.handler = async (event) => {
+    
+    console.log(`EVENT: ${JSON.stringify(event)}`);
+    
+    var params = {
+      ExpressionAttributeValues: {
+        ':channel': 'default'
+       },
+     KeyConditionExpression: 'channel = :channel',
+     TableName: process.env.STORAGE_TABLES_NAME
+    };
+    
+    var result = await docClient.query(params).promise();
+    
+    const keywords = []
+    const idCounter = []
+    const kids = []
+    
+    for (const item of result.Items){
+        const tmparr = item.values.split(',')
+        keywords.push.apply(keywords, tmparr)
+        idCounter[item.keyword] = 0
+        
+        for( const k of tmparr){
+            kids.push({ 'value': item.keyword, 'id': item.keyword })
+        }
+        
+    }
+    
+    console.log(keywords);
+    
+    for (const record of event.Records) {
+        console.log(record.eventID);
+        console.log(record.eventName);
+        console.log('DynamoDB Record: %j', record.dynamodb);
+        
+        if (record.eventName=="INSERT"){
+            console.log(record.dynamodb.NewImage.content.S);
+            
+            keywords.forEach(function(word, index) {
+                if (record.dynamodb.NewImage.content.S.toLowerCase().includes(word)) {
+                    console.log(word)
+                    console.log(index)
+                    idCounter[kids[index].id] += 1;
+                    
+                }
+            })
+            
+        }    
+    
+    }
+    
+    console.log(idCounter);
+    
+    for (const [key, value] of Object.entries(idCounter)) {
+        var params = {
+          TableName: process.env.STORAGE_TABLES_NAME,
+          Key: {
+            'channel' : 'default',
+            'keyword' : key
+          },
+          AttributeUpdates: {
+              'counter' : {
+                  Action: 'ADD',
+                  Value: value
+              }
+          }
+        };
+        const result = await docClient.update(params).promise()
+    }
+    
+    return `Successfully processed ${event.Records.length} records.`
+
+};
+```
 
 Update the file amplify/backend/function/triggerMessages/custom-policies.json with the following:
 
@@ -147,7 +303,7 @@ Update the file amplify/backend/function/triggerMessages/custom-policies.json wi
 ``` json
 [
   {
-    "Action": ["dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:DescribeStream", "dynamodb:ListStreams", "kinesis:ListShards", "comprehend:DetectSentiment"],
+    "Action": ["dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:DescribeStream", "dynamodb:ListStreams", "kinesis:ListShards"],
     "Resource": ["*"]
   }
 ]
