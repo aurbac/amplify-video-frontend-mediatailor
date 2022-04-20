@@ -309,6 +309,45 @@ Update the file amplify/backend/function/triggerMessages/custom-policies.json wi
 ]
 ```
 
+7. **Add the Lambda function that updates the Media services**
+
+
+``` bash
+amplify add function
+```
+
+* ? Select which capability you want to add: **Lambda function (serverless function)**
+* ? Provide an AWS Lambda function name: **updateMedia**
+* ? Choose the runtime that you want to use: **NodeJS**
+* ? Choose the function template that you want to use: **Hello World**
+
+Available advanced settings:
+- Resource access permissions
+- Scheduled recurring invocation
+- Lambda layers configuration
+- Environment variables configuration
+- Secret values configuration
+
+* ? Do you want to configure advanced settings? **Yes**
+* ? Do you want to access other resources in this project from your Lambda function? **Yes**
+* ? Select the categories you want this function to have access to. **storage**
+* ? Storage has 2 resources in this project. Select the one you would like your Lambda to access **tables**
+* ? Select the operations you want to permit on tables **read, update**
+
+You can access the following resource attributes as environment variables from your Lambda function
+        ENV
+        REGION
+        STORAGE_TABLES_ARN
+        STORAGE_TABLES_NAME
+        STORAGE_TABLES_STREAMARN
+* ? Do you want to invoke this function on a recurring schedule? **Yes**
+* ? At which interval should the function be invoked: **Minutes**
+* ? Enter the rate in minutes: **2**
+* ? Do you want to enable Lambda layers for this function? **No**
+* ? Do you want to configure environment variables for this function? **No**
+* ? Do you want to configure secret values this function can access? **No**
+* ? Do you want to edit the local lambda function now? **No**
+
 Deploy cloud services.
 
 ``` bash
@@ -320,7 +359,7 @@ amplify push
 Configure dynamodb tablle trigger using the "triggerMessages" function.
 
 
-6. **Add Hosting**
+8. **Add Hosting**
 
 For this exercise we are going to choose manual deploys allows you to publish your web app to the Amplify Console without connecting a Git provider.
 
