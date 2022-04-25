@@ -344,9 +344,114 @@ You can access the following resource attributes as environment variables from y
 * ? At which interval should the function be invoked: **Minutes**
 * ? Enter the rate in minutes: **2**
 * ? Do you want to enable Lambda layers for this function? **No**
-* ? Do you want to configure environment variables for this function? **No**
+* ? Do you want to configure environment variables for this function? **Yes**
+* ? Enter the environment variable name: **CHANNEL_ID**
+* ? Enter the environment variable value: **<channel_id>**
+* ? Select what you want to do with environment variables: **Add new environment variable**
+* ? Enter the environment variable name: **BUCKET_NAME**
+* ? Enter the environment variable value: **<bucket_name>**
+* ? Select what you want to do with environment variables: **Add new environment variable**
+* ? Enter the environment variable name: **OBJECT_KEY**
+* ? Enter the environment variable value: **<path/key_xml.xml>**
+* ? Select what you want to do with environment variables: **I'm done**
+
+You can access the following resource attributes as environment variables from your Lambda function
+        ENV
+        REGION
+        STORAGE_TABLES_NAME
+        STORAGE_TABLES_ARN
+        STORAGE_TABLES_STREAMARN
+        CHANNEL_ID
+        BUCKET_NAME
+        OBJECT_KEY
 * ? Do you want to configure secret values this function can access? **No**
 * ? Do you want to edit the local lambda function now? **No**
+
+Update the amplify/backend/function/updateMedia/src/index.js file with the following:
+
+``` javascript
+/* Amplify Params - DO NOT EDIT
+	ENV
+	REGION
+	STORAGE_TABLES_NAME
+	STORAGE_TABLES_ARN
+	STORAGE_TABLES_STREAMARN
+	CHANNEL_ID
+	BUCKET_NAME
+	OBJECT_KEY
+Amplify Params - DO NOT EDIT */
+
+const AWS = require('aws-sdk');
+AWS.config.update({region: process.env.REGION});
+
+var docClient = new AWS.DynamoDB.DocumentClient();
+var medialive = new AWS.MediaLive();
+
+/**
+ * @type {import('@types/aws-lambda').APIGatewayProxyHandler}
+ */
+exports.handler = async (event) => {
+    console.log(`EVENT: ${JSON.stringify(event)}`);
+    
+    var params = {
+      ExpressionAttributeValues: {
+        ':channel': 'default'
+       },
+     KeyConditionExpression: 'channel = :channel',
+     TableName: process.env.STORAGE_TABLES_NAME
+    };
+    
+    var result = await docClient.query(params).promise();
+    console.log(result);
+    
+    var values = result.Items.sort(function (a, b) {
+      return b.counter - a.counter;
+    });
+    
+    var params = {
+      ChannelId: process.env.CHANNEL_ID,
+      Creates: {
+        ScheduleActions: [
+          {
+            ActionName: 'ad-'+Date.now(),
+            ScheduleActionSettings: {
+              Scte35SpliceInsertSettings: {
+                SpliceEventId: '3',
+                Duration: '5400000'
+              },  
+          },
+         ScheduleActionStartSettings: {
+              ImmediateModeScheduleActionStartSettings: {
+              }
+            }  
+          },
+        ]
+      },
+    };
+    
+    var result2 = await medialive.batchUpdateSchedule(params).promise();
+    console.log(result);
+    
+    console.log(values);
+    
+};
+```
+
+Update the file amplify/backend/function/updateMedia/custom-policies.json with the following:
+
+
+``` json
+[
+  {
+    "Action": ["medialive:BatchUpdateSchedule"],
+    "Resource": ["*"]
+  },
+  {
+    "Action": ["s3:PutObject"],
+    "Resource": ["arn:aws:s3:::elementalmx-demos/*"]
+  }
+]
+```
 
 Deploy cloud services.
 
