@@ -489,7 +489,7 @@ exports.handler = async (event) => {
 };
 ```
 
-Update the file amplify/backend/function/updateMedia/custom-policies.json with the following:
+Update the file amplify/backend/function/updateMedia/custom-policies.json with the following, change <bucket_name> with the name of your xml bucket:
 
 
 ``` json
@@ -500,12 +500,12 @@ Update the file amplify/backend/function/updateMedia/custom-policies.json with t
   },
   {
     "Action": ["s3:PutObject","s3:PutObjectAcl"],
-    "Resource": ["arn:aws:s3:::elementalmx-demos/*"]
+    "Resource": ["arn:aws:s3:::<bucket_name>/*"]
   }
 ]
 ```
 
-Create the sample XML file for Media Tailor in amplify/backend/function/updateMedia/src/sample.xml
+Create the sample XML file for Media Tailor in amplify/backend/function/updateMedia/src/sample.xml, the lambda function will use the sample file to upload with the top video of the last minutes.
 
 ``` xml
 <VAST version="3.0">
