@@ -3,7 +3,6 @@
 
 In this section, we describe the steps that we need to follow to create the frontend services using the Amplify tools and services to build the React application.
 
-
 ## Prerequisites
 
 * Obtain an [AWS Account](http://aws.amazon.com/).
@@ -11,7 +10,6 @@ In this section, we describe the steps that we need to follow to create the fron
   * [AWS CLI configured with IAM Credentials with administrator access](https://docs.aws.amazon.com/cli/latest/reference/configure/).
   * [Install the Amplify CLI](https://docs.amplify.aws/cli/start/install).
   * [Install the CDK CLI](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html#getting_started_install).
-
 
 1. **Create and initialize Amplify project**
 
@@ -75,6 +73,13 @@ amplify add api
 ```
 
 * ? Select from one of the below mentioned services: **GraphQL**
+
+* ? Use the following configuration:
+  Name: **amplifyvideofrontend**
+  Authorization modes: **Amazon Cognito User Pool**
+  Conflict detection (required for DataStore): **Disabled **
+
+* Configure additional auth types? **No**
 * ? Here is the GraphQL API that we will create. Select a setting to edit or continue **Continue**
 * ? Choose a schema template: **Single object with fields (e.g., “Todo” with ID, name, description)**
 * Do you want to edit the schema now? **No**
@@ -84,9 +89,8 @@ Edit the schema by opening the new amplify/backend/api/schema.graphql file in yo
 ```
 # This "input" configures a global authorization rule to enable public access to
 # all models in this schema. Learn more about authorization rules here: https://docs.amplify.aws/cli/graphql/authorization-rules
-input AMPLIFY { globalAuthRule: AuthRule = { allow: public } } # FOR TESTING ONLY!
 
-type Message @model(subscriptions: null)
+type Message @model(subscriptions: null) @auth(rules: [{ allow: private }])
 {
   id: ID!
   channel: String! @index(name: "messagesByDate", queryField: "messagesByDate", sortKeyFields: ["createdAt"])
@@ -289,6 +293,7 @@ exports.handler = async (event) => {
               }
           }
         };
+        console.log(params);
         const result = await docClient.update(params).promise()
     }
     
@@ -381,11 +386,13 @@ Update the amplify/backend/function/updateMedia/src/index.js file with the follo
 	OBJECT_KEY
 Amplify Params - DO NOT EDIT */
 
+const fs = require("fs");
 const AWS = require('aws-sdk');
 AWS.config.update({region: process.env.REGION});
 
-var docClient = new AWS.DynamoDB.DocumentClient();
-var medialive = new AWS.MediaLive();
+const docClient = new AWS.DynamoDB.DocumentClient();
+const medialive = new AWS.MediaLive();
+const s3 = new AWS.S3();
 
 /**
  * @type {import('@types/aws-lambda').APIGatewayProxyHandler}
@@ -408,6 +415,30 @@ exports.handler = async (event) => {
       return b.counter - a.counter;
     });
     
+
+    const buffer = await fs.readFileSync("sample.xml");
+    
+    var content_xml = buffer.toString();
+    
+    content_xml = content_xml.replace("_AD_TITLE_",values[0].keyword)
+    content_xml = content_xml.replace("_DURATION_",values[0].video_duration)
+    content_xml = content_xml.replace("_PATH_VIDEO_",values[0].video_url)
+    
+    try {
+        const params = {
+            ACL: 'public-read',
+            Bucket: process.env.BUCKET_NAME,
+            Key: process.env.OBJECT_KEY,
+            Body: content_xml,
+            ContentType: "application/xml"
+        };const result = await s3.putObject(params).promise(); 
+        console.log(`File uploaded successfully at https:/` + process.env.BUCKET_NAME + `.s3.amazonaws.com/` + process.env.OBJECT_KEY);
+        
+    } catch (error) {
+        console.log(error);
+    }
+
+
     var params = {
       ChannelId: process.env.CHANNEL_ID,
       Creates: {
@@ -416,8 +447,8 @@ exports.handler = async (event) => {
             ActionName: 'ad-'+Date.now(),
             ScheduleActionSettings: {
               Scte35SpliceInsertSettings: {
-                SpliceEventId: '3',
-                Duration: '5400000'
+                SpliceEventId: Date.now(),
+                Duration: '1350000'
               },  
           },
          ScheduleActionStartSettings: {
@@ -429,10 +460,31 @@ exports.handler = async (event) => {
       },
     };
     
-    var result2 = await medialive.batchUpdateSchedule(params).promise();
     console.log(result);
     
     console.log(values);
+    
+    var result2 = await medialive.batchUpdateSchedule(params).promise();
+    
+    for (const value of values) {
+        var params = {
+          TableName: process.env.STORAGE_TABLES_NAME,
+          Key: {
+            'channel' : 'default',
+            'keyword' : value.keyword
+          },
+          AttributeUpdates: {
+              'counter' : {
+                  Action: 'PUT',
+                  Value: 0
+              }
+          }
+        };
+        const result = await docClient.update(params).promise()
+        console.log(result);
+    }
+    
+    console.log(content_xml);
     
 };
 ```
@@ -447,10 +499,36 @@ Update the file amplify/backend/function/updateMedia/custom-policies.json with t
     "Resource": ["*"]
   },
   {
-    "Action": ["s3:PutObject"],
+    "Action": ["s3:PutObject","s3:PutObjectAcl"],
     "Resource": ["arn:aws:s3:::elementalmx-demos/*"]
   }
 ]
+```
+
+Create the sample XML file for Media Tailor in amplify/backend/function/updateMedia/src/sample.xml
+
+``` xml
+<VAST version="3.0">
+    <Ad sequence="1">
+        <InLine>
+            <AdSystem>2.0</AdSystem>
+            <AdTitle>_AD_TITLE_</AdTitle>
+            <Impression/>
+            <Creatives>
+                <Creative>
+                    <Linear>
+                        <Duration>_DURATION_</Duration>
+                        <MediaFiles>
+                            <MediaFile delivery="progressive" type="video/mp4" width="1280" height="720">
+                                <![CDATA[_PATH_VIDEO_]]>
+                            </MediaFile>
+                        </MediaFiles>
+                    </Linear>
+                </Creative>
+            </Creatives>
+        </InLine>
+    </Ad>
+</VAST>
 ```
 
 Deploy cloud services.
